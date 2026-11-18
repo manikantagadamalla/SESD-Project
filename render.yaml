@@ -1,0 +1,67 @@
+databases:
+  - name: intellistock-db
+    databaseName: intellistock
+    user: intellistock
+    plan: free
+
+services:
+  # Python ML Service
+  - type: web
+    name: intellistock-ml
+    runtime: python
+    rootDir: ml-service
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: intellistock-db
+          property: connectionString
+      - key: ML_API_KEY
+        generateValue: true
+
+  # Node.js Express API Backend
+  - type: web
+    name: intellistock-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: intellistock-db
+          property: connectionString
+      - key: ML_SERVICE_URL
+        fromService:
+          type: web
+          name: intellistock-ml
+          property: host
+      - key: ML_API_KEY
+        fromService:
+          type: web
+          name: intellistock-ml
+          envVarKey: ML_API_KEY
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+
+  # React Vite Frontend (Static Site)
+  - type: web
+    name: intellistock-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false

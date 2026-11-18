@@ -14,7 +14,7 @@ const axios = require("axios");
 const pool = require("../db/db");
 const { createNotification } = require("../utils/notification.helper");
 
-const ML_BASE_URL = "http://127.0.0.1:8000";
+const ML_BASE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:8000";
 
 const getConfiguredApiKey = () => {
   const apiKey = process.env.ML_API_KEY;

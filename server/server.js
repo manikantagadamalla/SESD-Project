@@ -204,6 +204,15 @@ const seedDemoUsers = async () => {
 
 const startServer = async () => {
   try {
+    if (pool.ensureDatabaseSchema) {
+      await pool.ensureDatabaseSchema();
+      logger.info('Database schema verified successfully');
+    }
+  } catch (err) {
+    logger.error('Database schema initialization failed', { error: err.message });
+  }
+
+  try {
     await pool.ensureShopDetailsTable();
     logger.info('Shop details table verified successfully');
   } catch (err) {
