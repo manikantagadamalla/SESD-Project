@@ -81,7 +81,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
 }));
-app.options('*', cors());
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 // DISABLED FOR DEVELOPMENT - All endpoints are accessible without rate limiting
