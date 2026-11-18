@@ -39,7 +39,8 @@ function Login() {
       const role = response.user.role
       navigate(role === 'admin' ? '/admin' : role === 'staff' ? '/staff' : '/client')
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials. Please check your email and password.')
+      const msg = err.response?.data?.message || (err.message === 'Network Error' ? 'Network error: could not reach backend API.' : 'Invalid credentials. Please check your email and password.')
+      setError(msg)
     } finally {
       setLoading(false)
     }

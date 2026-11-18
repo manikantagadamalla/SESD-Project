@@ -61,18 +61,27 @@ const isLocalhostOrigin = (origin) => {
   return /^(https?:\/\/)(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 };
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return true;
+  if (isLocalhostOrigin(origin)) return true;
+  if (origin.endsWith('.onrender.com') || origin.endsWith('.vercel.app')) return true;
+  return false;
+};
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
-      callback(new Error(`CORS policy blocked origin: ${origin}`));
+      callback(null, false);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
 }));
+app.options('*', cors());
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 // DISABLED FOR DEVELOPMENT - All endpoints are accessible without rate limiting
