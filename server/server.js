@@ -144,6 +144,24 @@ app.get("/health/db", async (req, res) => {
   }
 });
 
+// ── Sample data seed endpoint ────────────────────────────────────────────────
+app.all(["/api/seed", "/api/seed-sample-data"], async (req, res) => {
+  try {
+    if (pool.seedSampleData) {
+      const stats = await pool.seedSampleData();
+      return res.json({
+        success: true,
+        message: "Sample data seeded successfully! 🚀",
+        stats
+      });
+    }
+    res.status(500).json({ success: false, message: "Seed helper not available" });
+  } catch (err) {
+    logger.error("Manual seed error", { error: err.message });
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── Global error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   logger.error('Unhandled error', {
@@ -239,6 +257,19 @@ const startServer = async () => {
     logger.info('Demo users seeded successfully');
   } catch (err) {
     logger.error('Demo seeding failed, continuing to start server', { error: err.message });
+  }
+
+  try {
+    const prodCheck = await pool.query("SELECT COUNT(*) FROM products");
+    if (parseInt(prodCheck.rows[0].count, 10) === 0) {
+      logger.info('Database has 0 products. Seeding sample dataset...');
+      if (pool.seedSampleData) {
+        const stats = await pool.seedSampleData();
+        logger.info('Sample data seeded successfully on startup:', stats);
+      }
+    }
+  } catch (err) {
+    logger.error('Sample data seeding check failed:', { error: err.message });
   }
 
   app.listen(PORT, () => {

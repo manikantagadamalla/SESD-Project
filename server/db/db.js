@@ -1,4 +1,6 @@
 const { Pool } = require("pg");
+const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
 
 const dbPort = process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432;
@@ -136,6 +138,60 @@ const ensureDatabaseSchema = async () => {
       user_agent TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS loyalty_programs (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      purchase_threshold DECIMAL(12, 2),
+      discount_percentage DECIMAL(5, 2) NOT NULL,
+      loyalty_points_per_rupee DECIMAL(5, 2) DEFAULT 0.01,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id SERIAL PRIMARY KEY,
+      invoice_number VARCHAR(50) NOT NULL UNIQUE,
+      customer_id INT,
+      subtotal DECIMAL(12, 2) NOT NULL,
+      tax DECIMAL(12, 2) NOT NULL,
+      discount DECIMAL(12, 2) DEFAULT 0,
+      discount_percentage DECIMAL(5, 2) DEFAULT 0,
+      total DECIMAL(12, 2) NOT NULL,
+      payment_method VARCHAR(50) DEFAULT 'cash',
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS invoice_items (
+      id SERIAL PRIMARY KEY,
+      invoice_id INT NOT NULL,
+      product_id INT NOT NULL,
+      quantity INT NOT NULL CHECK (quantity > 0),
+      rate DECIMAL(12, 2) NOT NULL,
+      gst_percentage DECIMAL(5, 2) DEFAULT 18,
+      gst_amount DECIMAL(12, 2),
+      total DECIMAL(12, 2) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+    );
+
+    CREATE TABLE IF NOT EXISTS low_stock_alerts (
+      id SERIAL PRIMARY KEY,
+      product_id INT NOT NULL,
+      alert_status VARCHAR(20) DEFAULT 'pending',
+      current_stock INT,
+      reorder_level INT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      acknowledged_at TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
+    ALTER TABLE sales ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(80);
   `);
 };
 
@@ -168,9 +224,31 @@ const ensureSalesTransactionColumn = async () => {
   `);
 };
 
+const seedSampleData = async () => {
+  const seedSqlPath = path.join(__dirname, "seed-sample-data.sql");
+  if (fs.existsSync(seedSqlPath)) {
+    const sql = fs.readFileSync(seedSqlPath, "utf8");
+    await pool.query(sql);
+
+    const prods = await pool.query("SELECT COUNT(*) FROM products WHERE sku LIKE 'SMP-%'");
+    const custs = await pool.query("SELECT COUNT(*) FROM customers WHERE mobile_number LIKE '90000000%'");
+    const sales = await pool.query("SELECT COUNT(*) FROM sales WHERE transaction_id LIKE 'SEED-TXN-%'");
+    const invs = await pool.query("SELECT COUNT(*) FROM invoices WHERE invoice_number LIKE 'SEED-INV-%'");
+
+    return {
+      products: parseInt(prods.rows[0].count, 10),
+      customers: parseInt(custs.rows[0].count, 10),
+      sales: parseInt(sales.rows[0].count, 10),
+      invoices: parseInt(invs.rows[0].count, 10),
+    };
+  }
+  return null;
+};
+
 pool.ensureDatabaseSchema = ensureDatabaseSchema;
 pool.ensureShopDetailsTable = ensureShopDetailsTable;
 pool.ensureSalesTransactionColumn = ensureSalesTransactionColumn;
+pool.seedSampleData = seedSampleData;
 
 pool.connect()
   .then(() => console.log("PostgreSQL Connected Successfully ✅"))
